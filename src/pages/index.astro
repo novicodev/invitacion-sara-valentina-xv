@@ -1,0 +1,197 @@
+---
+// HORA POR DEFINIR — default 7:00 p.m., update when set
+const date = new Date('2026-10-03T19:00:00-05:00');
+const mapEmbed =
+  'https://maps.google.com/maps?q=' +
+  encodeURIComponent('Av. 33 #74e-116, Laureles - Estadio, Medellín, Antioquia, Colombia') +
+  '&z=16&output=embed';
+const mapUrl =
+  'https://www.google.com/maps/search/?api=1&query=' +
+  encodeURIComponent('Av. 33 #74e-116, Laureles - Estadio, Medellín, Antioquia, Colombia');
+const message = encodeURIComponent('Hola, confirmo mi asistencia a los XV años de Susana.');
+const phone = '573007329023';
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="theme-color" content="#4C2D1F" />
+    <title>Mis XV · Susana</title>
+  </head>
+  <body>
+    <main>
+      <section class="cover">
+        <div class="cover-art" aria-hidden="true"></div>
+
+        <div class="cover-copy">
+          <p class="eyebrow">Una noche de ensueño</p>
+          <p class="small-title">Mis</p>
+          <h1>XV</h1>
+          <p class="name">Susana Garcés Restrepo</p>
+          <p class="date">03 · 10 · 2026</p>
+          <a class="scroll-arrow" href="#historia" aria-label="Continuar a la invitación">↓</a>
+        </div>
+      </section>
+
+      <section class="story section" id="historia">
+        <p class="eyebrow">Una nueva etapa</p>
+
+        <div class="invite">
+          <p class="invite-family">La familia Garcés Restrepo</p>
+          <p class="invite-cta">te invita a celebrar los XV años de</p>
+          <p class="invite-hero">Susana</p>
+        </div>
+
+        <h2 class="story-heading">Hay sueños que<br />alzan vuelo y<br /><em>se quedan para siempre.</em></h2>
+
+        <div class="copy invite-copy">
+          <p>Quince años, una mariposa que despliega sus alas y una noche que brillará para siempre. Quiero compartir contigo la magia de este momento tan especial.</p>
+          <p>Hay historias y personas que no voy a olvidar y recuerdos como este que siempre voy a guardar.</p>
+          <p>Porque son parte de mi vida es mi deseo que compartan conmigo este día tan especial.</p>
+          <p>Te espero con mucha ilusión para compartir este momento tan especial.</p>
+          <p class="signature">Con cariño,<br /><strong>Susana</strong></p>
+        </div>
+      </section>
+
+      <section class="event section">
+        <p class="eyebrow">Guarda la fecha</p>
+        <div class="event-card">
+          <div><span class="label">Sábado</span><strong class="date-display"><b>3</b><span>octubre<br /><small>2026</small></span></strong></div>
+          <div><span class="label">Recepción</span><strong>7:00<br /><small>p. m.</small></strong></div>
+        </div>
+        <div class="countdown" data-countdown data-target={date.toISOString()}><div><b data-days>00</b><span>días</span></div><div><b data-hours>00</b><span>horas</span></div><div><b data-minutes>00</b><span>minutos</span></div><div><b data-seconds>00</b><span>segundos</span></div></div>
+        <p class="punctual">Te esperamos con puntualidad para disfrutar desde el inicio de la fiesta y compartir más tiempo juntos.</p>
+      </section>
+
+      <section class="venue section">
+        <div class="venue-photo"><iframe title="Ubicación de la recepción" src={mapEmbed} style="border:0" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+        <div class="venue-copy">
+          <p class="eyebrow">El lugar</p>
+          <h2>Laureles · Estadio<br /><em>Medellín</em></h2>
+          <address>Av. 33 # 74 e-116<br />Laureles - Estadio · Medellín, Antioquia</address>
+          <a class="button" href={mapUrl} target="_blank" rel="noreferrer">Cómo llegar <span>↗</span></a>
+        </div>
+      </section>
+
+      <section class="details section">
+        <p class="eyebrow">Detalles de la noche</p>
+        <h2 class="details-title">Todo pensado para<br /><em>celebrar juntos.</em></h2>
+        <div class="detail-grid">
+          <article><span class="detail-symbol">✦</span><h3>Código de<br /><em>vestimenta</em></h3><p><strong>Elegante</strong><br />Se permiten <span class="earth-word">colores tierra</span>, blanco y negro.</p></article>
+          <article><span class="detail-symbol">♡</span><h3>Mesa de<br /><em>regalos</em></h3><p><strong>Lluvia de sobres</strong><br />Tu presencia será nuestro regalo más bonito.</p></article>
+        </div>
+      </section>
+
+      <section class="rsvp section">
+        <p class="eyebrow">Confirma tu asistencia</p>
+        <h2>¿Nos<br /><em>acompañas?</em></h2>
+        <p>Por favor confirma antes del <strong>20 de septiembre de 2026</strong>.</p>
+
+        <div class="confirm-note" role="note">
+          <strong>Confirma tu asistencia para asegurar tu lugar</strong>
+          <span>Así podremos tener todo preparado y esperarte como te mereces.</span>
+        </div>
+
+        <div class="actions"><a class="button button-light" href={`https://wa.me/${phone}?text=${message}`} target="_blank" rel="noreferrer">Confirmar por WhatsApp ↗</a></div>
+      </section>
+
+      <footer>
+        <p class="hashtag">#Mis15Susana</p>
+        <p class="footer-name">Susana · XV</p>
+      </footer>
+    </main>
+
+    <script is:inline>
+      const countdown = document.querySelector('[data-countdown]');
+      const tick = () => { const diff = Math.max(0, new Date(countdown.dataset.target).getTime() - Date.now()); const values = [Math.floor(diff / 86400000), Math.floor(diff / 3600000) % 24, Math.floor(diff / 60000) % 60, Math.floor(diff / 1000) % 60]; ['days','hours','minutes','seconds'].forEach((key, i) => document.querySelector(`[data-${key}]`).textContent = String(values[i]).padStart(2, '0')); };
+      tick(); setInterval(tick, 1000);
+    </script>
+  </body>
+</html>
+
+<style is:global>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Parisienne&family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
+:root{--cream:#F8F3EA;--off-white:#EDE9E2;--sand:#DCCDB4;--rose:#C9A496;--terracotta:#B07B5C;--brown:#8C6B58;--olive:#96702B;--taupe:#87736C;--espresso:#4C2D1F;--black:#1A1A1A;--white:#FFFFFF;--serif:'Playfair Display',Georgia,serif;--sans:'DM Sans',sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--cream);color:#3B2E24;font:17px/1.65 var(--sans)}main{overflow:hidden}
+.cover{min-height:100svh;position:relative;display:grid;place-items:end center;padding-bottom:7vh;text-align:center;color:#F8F3EA;background:var(--espresso)}
+.cover-art{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 0%,#6a4030 0%,#4C2D1F 55%,#33201a 100%)}
+.cover-art:after{content:'';position:absolute;inset:0;background:radial-gradient(60% 45% at 50% 82%,#B07B5C33 0%,transparent 70%)}
+.cover:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#4C2D1F00,#4C2D1Fc7)}
+.cover-copy{position:relative;z-index:1;width:min(92%,650px)}
+.eyebrow,.label{letter-spacing:.18em;text-transform:uppercase;font-size:.7rem}
+.cover .eyebrow{color:#E8DCC9}.small-title{font:italic 1.6rem var(--serif);margin:4rem 0 0}
+.cover h1{font:clamp(10rem,35vw,19rem)/.8 var(--serif);font-weight:400;letter-spacing:-.08em;margin:.4rem 0;background:linear-gradient(110deg,#FFF7EC 12%,#DCCDB4 35%,#FFF8EE 48%,#B07B5C 62%,#EAD9C2 80%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;animation:xv-shine 4.5s ease-in-out infinite}
+@keyframes xv-shine{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.name{font:italic clamp(4.5rem,16vw,10rem)/.85 'Parisienne',cursive;letter-spacing:.01em;text-transform:none;margin:3.5rem 0 1.15rem;color:#F6ECD9;text-shadow:0 2px 18px #2a160dcc}
+.date{margin-top:1.6rem;letter-spacing:.2em;color:#E8DCC9}
+.scroll-arrow{display:inline-block;margin-top:5rem;color:#DCCDB4;text-decoration:none;font:2rem/1 var(--serif);animation:float-arrow 2s ease-in-out infinite}
+.scroll-arrow:focus-visible{outline:1px solid #fff;padding:.3rem}
+@keyframes float-arrow{50%{transform:translateY(7px)}}
+.section{padding:clamp(5rem,12vw,10rem) clamp(1.5rem,8vw,9rem)}
+.eyebrow{color:var(--olive);margin:0 0 .8rem}
+.story{background:var(--cream);text-align:center;position:relative}
+.invite{margin-bottom:clamp(2.5rem,6vw,4rem)}
+.invite-family{font:italic 1.15rem var(--serif);margin:0 0 .5rem;letter-spacing:.02em}
+.invite-cta{margin:.4rem 0;color:#6B564A}
+.invite-hero{font:italic clamp(3rem,10vw,6rem)/1 'Parisienne',cursive;margin:.4rem 0 0;color:var(--espresso)}
+.story-heading{font:400 clamp(2.4rem,6vw,4.2rem)/1.08 var(--serif);letter-spacing:-.03em;margin:0 0 2rem}
+.story-heading em,.details-title em{font-style:italic;color:var(--terracotta);background:linear-gradient(110deg,#8C6B58,#DCCDB4 60%,#96702B);-webkit-background-clip:text;background-clip:text;color:transparent}
+.copy{max-width:620px;margin:0 auto;text-align:left}
+.invite-copy p{margin:0 0 1.1rem;color:#4C3B32}
+.signature{font:italic 1.3rem var(--serif);color:var(--espresso);margin-top:1.6rem}
+.event{position:relative;overflow:hidden;background:var(--espresso);color:#F3E9DC;text-align:center}
+.event .eyebrow{color:var(--sand)}
+.event-card{display:flex;justify-content:center;gap:clamp(2.5rem,8vw,6rem);margin:1rem 0 2.5rem}
+.event-card .label{color:#CBB8A2;display:block;margin-bottom:.5rem}
+.event-card strong{font:400 clamp(2rem,5vw,3.2rem)/1 var(--serif)}
+.date-display{display:flex;align-items:center;gap:.7rem;justify-content:center}
+.date-display b{font-size:clamp(3.4rem,9vw,5.6rem);line-height:.9;color:var(--sand)}
+.date-display span{font-size:1.05rem;line-height:1.25;text-align:left;color:#F3E9DC}
+.date-display small{color:#CBB8A2}
+.countdown{display:flex;justify-content:center;gap:clamp(1rem,4vw,2.2rem);margin:0 0 2rem}
+.countdown div{min-width:74px}
+.countdown b{font:500 clamp(1.6rem,4vw,2.4rem) var(--sans);color:var(--sand)}
+.countdown span{display:block;font:500 .66rem var(--sans);letter-spacing:.16em;text-transform:uppercase;color:#CBB8A2}
+.punctual{max-width:480px;margin:0 auto;color:#D9CBB8;font-size:.95rem}
+.venue{position:relative;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;gap:clamp(1.5rem,5vw,4rem);align-items:center;background:var(--cream)}
+.venue-photo{position:relative;min-height:320px;border-radius:2px;overflow:hidden;box-shadow:14px 14px 0 var(--sand)}
+.venue-photo iframe{position:absolute;inset:0;width:100%;height:100%}
+.venue-copy .eyebrow{margin-top:0}
+.venue-copy h2{font:400 clamp(2rem,5vw,3.2rem)/1.1 var(--serif);letter-spacing:-.02em;margin:.2rem 0 1rem;color:var(--espresso)}
+.venue-copy h2 em{color:var(--terracotta)}
+.venue-copy address{font-style:normal;color:#4C3B32;margin:0 0 1.4rem}
+.button{display:inline-block;border:1px solid var(--terracotta);background:var(--terracotta);color:#FFF8EE;text-decoration:none;padding:.85rem 1.5rem;font:500 .78rem var(--sans);letter-spacing:.1em;text-transform:uppercase}
+.button:hover{background:var(--brown);border-color:var(--brown)}
+.button span{display:inline-block;margin-left:.3rem}
+.details{position:relative;overflow:hidden;text-align:center}
+.details-title{font:400 clamp(2.2rem,5vw,3.6rem)/1.1 var(--serif);letter-spacing:-.03em;margin:0 0 2.5rem;color:var(--espresso)}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.4rem;max-width:760px;margin:0 auto}
+.detail-grid article{border:1px solid #E0D6C2;background:#FBF6EC;padding:1.8rem 1.4rem;box-shadow:8px 8px 0 #DCCDB4}
+.detail-symbol{display:inline-block;font:1.5rem var(--serif);color:var(--terracotta);margin-bottom:.6rem}
+.detail-grid h3{font:400 1.35rem var(--serif);margin:.2rem 0 .9rem;color:var(--espresso)}
+.detail-grid h3 em{color:var(--terracotta)}
+.detail-grid p{margin:0;color:#4C3B32;font-size:.95rem}
+.earth-word{color:var(--olive);font-weight:500}
+.rsvp{position:relative;overflow:hidden;background:var(--espresso);color:#F3E9DC;text-align:center}
+.rsvp .eyebrow{color:var(--sand)}
+.rsvp h2{font:400 clamp(2.4rem,6vw,4rem)/1 var(--serif);letter-spacing:-.03em;margin:0 0 1.2rem}
+.rsvp h2 em{color:var(--sand)}
+.rsvp p{color:#D9CBB8;margin:0 0 .6rem}
+.confirm-note{max-width:520px;margin:1.6rem auto 1.8rem;border:1px solid var(--terracotta);background:#4C2D1F66;padding:1rem 1.2rem;display:flex;flex-direction:column;gap:.25rem}
+.confirm-note strong{color:var(--sand);font:italic 1.15rem var(--serif)}
+.confirm-note span{color:#E8DCC9;font-size:.9rem}
+.actions{margin-top:1.4rem}
+.button-light{background:transparent;color:var(--sand);border-color:var(--terracotta)}
+.button-light:hover{background:var(--terracotta);color:#FFF8EE}
+footer{background:#2E1C14;color:#B39A80;text-align:center;padding:3rem 1rem 2.5rem;position:relative;font-size:.9rem}
+.hashtag{letter-spacing:.08em;margin:0 0 .4rem}
+.footer-name{font:italic 1.2rem var(--serif);color:#E8DCC9;margin:0}
+
+@media (max-width:720px){
+  .venue{grid-template-columns:1fr}
+  .venue-photo{min-height:240px}
+  .cover-copy{width:min(94%,520px)}
+}
+</style>
