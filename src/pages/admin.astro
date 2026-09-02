@@ -1,0 +1,704 @@
+---
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="theme-color" content="#4C2D1F" />
+    <title>Admin · Mis XV Susana</title>
+  </head>
+  <body>
+    <main class="admin-main">
+      <section class="admin-hero">
+        <a href="/" class="admin-back">← Volver a la invitación</a>
+        <h1>Administración <em>Susana XV</em></h1>
+        <p class="admin-subtitle">Panel privado — muro y lista de invitados</p>
+      </section>
+
+      <!-- ── Gate PIN ── -->
+      <section id="admin-gate" class="admin-gate section">
+        <div class="gate-card">
+          <h2>Acceso privado</h2>
+          <p>Ingresa el PIN de administradora para continuar.</p>
+          <form id="gate-form" class="gate-form" novalidate>
+            <label class="field">
+              <span>PIN <i>*</i></span>
+              <input id="gate-pin" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            </label>
+            <button type="submit" class="button" id="gate-submit">Entrar</button>
+            <p id="gate-hint" class="gate-hint" aria-live="polite"></p>
+            <p class="gate-help">PIN inicial: <code>susana2026</code> — cámbialo en Supabase SQL: <code>update susana_admin_settings set admin_token_hash = extensions.crypt('nuevoPIN', extensions.gen_salt('bf')) where id=1;</code></p>
+          </form>
+        </div>
+      </section>
+
+      <!-- ── Dashboard (oculto hasta login) ── -->
+      <div id="admin-dashboard" class="admin-dashboard" hidden>
+        <div class="admin-toolbar">
+          <span class="admin-badge">Sesión admin activa</span>
+          <button id="admin-logout" type="button" class="button button-light">Cerrar sesión</button>
+        </div>
+
+        <!-- MURO -->
+        <section class="section admin-section">
+          <div class="admin-section-head">
+            <div>
+              <p class="eyebrow">Moderación</p>
+              <h2>Muro de <em>canciones</em></h2>
+              <p class="admin-desc">Elimina contenido indebido. El muro público (/) refleja los cambios al instante.</p>
+            </div>
+            <span id="songs-count" class="song-count">0</span>
+          </div>
+          <div class="admin-actions-row">
+            <button id="songs-refresh" type="button" class="button button-light">Actualizar</button>
+            <span id="songs-hint" class="song-hint" aria-live="polite"></span>
+          </div>
+          <ul id="admin-song-wall" class="song-wall" aria-live="polite"></ul>
+          <p id="admin-song-empty" class="song-empty">No hay canciones aún.</p>
+        </section>
+
+        <!-- INVITADOS -->
+        <section class="section admin-section admin-section--accent">
+          <div class="admin-section-head">
+            <div>
+              <p class="eyebrow">Invitados</p>
+              <h2>Lista de <em>invitados</em></h2>
+              <p class="admin-desc">Añade con cupos y tratamiento (Querida/o/familia/grupo). Gestiona estado sin salir.</p>
+            </div>
+            <span id="guests-count" class="song-count">0</span>
+          </div>
+
+          <form id="guest-form" class="song-form guest-form" novalidate>
+            <div class="guest-grid">
+              <label class="field"><span>Nombre <i>*</i></span><input id="guest-name" type="text" maxlength="80" placeholder="Ej. Valentina García" required /></label>
+              <label class="field"><span>Cupos</span><input id="guest-cupos" type="number" min="1" max="999" value="1" /></label>
+              <label class="field"><span>Tratamiento</span>
+                <select id="guest-treatment">
+                  <option value="a" selected>Querida</option>
+                  <option value="d">Querido</option>
+                  <option value="fam">Querida familia</option>
+                  <option value="grupo">Queridos</option>
+                </select>
+              </label>
+            </div>
+            <div class="song-actions">
+              <button type="submit" class="button" id="guest-submit">Añadir invitado +</button>
+              <p id="guest-hint" class="song-hint" aria-live="polite"></p>
+            </div>
+          </form>
+
+          <div class="admin-actions-row">
+            <button id="guests-refresh" type="button" class="button button-light">Actualizar lista</button>
+            <span id="guests-hint" class="song-hint" aria-live="polite"></span>
+          </div>
+
+          <div class="admin-search">
+            <input id="guest-search" type="search" placeholder="Buscar por nombre…" autocomplete="off" />
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Nombre</th><th>Cupos</th><th>Estado</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="admin-guest-wall" aria-live="polite"></tbody>
+            </table>
+          </div>
+          <p id="admin-guest-empty" class="song-empty">No hay invitados aún. Añade el primero arriba.</p>
+        </section>
+      </div>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script is:inline>
+      (function(){
+        const SUPABASE_URL = 'https://pfzhazkcyarlwazwziec.supabase.co';
+        const SUPABASE_ANON = 'sb_publishable_mxYQbSZsvviLuSBm1-fUaQ_U4iAFIQ-';
+        const STORAGE_KEY = 'susana-admin-token';
+
+        const $gate = document.getElementById('admin-gate');
+        const $dash = document.getElementById('admin-dashboard');
+        const $gateForm = document.getElementById('gate-form');
+        const $pin = document.getElementById('gate-pin');
+        const $gateHint = document.getElementById('gate-hint');
+        const $logout = document.getElementById('admin-logout');
+
+        let adminToken = sessionStorage.getItem(STORAGE_KEY) || '';
+
+        // Milagros-style constants but with Susana statuses
+        const STATUS_LABEL = { pendiente: 'Pendiente', confirmado: 'Confirmado', declinado: 'No asistirá' };
+        const STATUS_CLASS = { pendiente: 'badge-pending', confirmado: 'badge-confirmed', declinado: 'badge-declined' };
+        const STATUS_ACTIONS = [
+          { value: 'confirmado', label: 'Confirmar', cls: 'btn-confirm' },
+          { value: 'declinado', label: 'No asistirá', cls: 'btn-decline' },
+          { value: 'pendiente', label: 'Pendiente', cls: 'btn-pending' },
+        ];
+        const TREATMENT_LABEL = {
+          a: 'Querida',
+          d: 'Querido',
+          fam: 'Querida familia',
+          grupo: 'Queridos',
+        };
+
+        const esc = (s) => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        const apiHeaders = () => ({ apikey: SUPABASE_ANON, Authorization: 'Bearer '+SUPABASE_ANON, 'Content-Type':'application/json' });
+
+        async function verifyToken(token){
+          try {
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_susana_admin`, {
+              method: 'POST',
+              headers: apiHeaders(),
+              body: JSON.stringify({ p_admin_token: token })
+            });
+            if(!r.ok) throw new Error(await r.text());
+            const v = await r.json();
+            return v === true;
+          } catch(e){
+            console.warn('[admin] verify failed', e);
+            return false;
+          }
+        }
+
+        function showToast(msg){
+          const el = document.getElementById('toast');
+          if(!el) return;
+          el.textContent = msg;
+          el.hidden = false;
+          setTimeout(()=>{ el.hidden = true; }, 2200);
+        }
+
+        function setLoggedIn(token){
+          adminToken = token;
+          sessionStorage.setItem(STORAGE_KEY, token);
+          $gate.hidden = true;
+          $gate.style.display = 'none';
+          $dash.hidden = false;
+          $dash.style.display = 'block';
+          loadSongs();
+          loadGuests();
+        }
+
+        function setLoggedOut(){
+          adminToken = '';
+          sessionStorage.removeItem(STORAGE_KEY);
+          $gate.hidden = false;
+          $gate.style.display = 'block';
+          $dash.hidden = true;
+          $dash.style.display = 'none';
+          if($pin) $pin.value = '';
+          if($gateHint) { $gateHint.textContent=''; $gateHint.className='gate-hint'; }
+        }
+
+        // Auto-login si hay token en sessionStorage
+        if(adminToken){
+          verifyToken(adminToken).then(ok => {
+            if(ok) setLoggedIn(adminToken);
+            else setLoggedOut();
+          });
+        }
+
+        if($logout) $logout.addEventListener('click', setLoggedOut);
+
+        if($gateForm) $gateForm.addEventListener('submit', async (e)=>{
+          e.preventDefault();
+          const token = ($pin.value||'').trim();
+          if(!token){
+            $gateHint.textContent='Escribe el PIN.';
+            $gateHint.className='gate-hint error';
+            return;
+          }
+          const btn = document.getElementById('gate-submit');
+          if(btn) { btn.disabled=true; btn.textContent='Verificando…'; }
+          $gateHint.textContent='Verificando…';
+          $gateHint.className='gate-hint';
+          const ok = await verifyToken(token);
+          if(btn) { btn.disabled=false; btn.textContent='Entrar'; }
+          if(ok){
+            $gateHint.textContent='Acceso concedido.';
+            $gateHint.className='gate-hint ok';
+            setTimeout(()=> setLoggedIn(token), 300);
+          } else {
+            $gateHint.textContent='PIN incorrecto.';
+            $gateHint.className='gate-hint error';
+          }
+        });
+
+        // ── Canciones (intacto) ──
+        const $songsWall = document.getElementById('admin-song-wall');
+        const $songsEmpty = document.getElementById('admin-song-empty');
+        const $songsCount = document.getElementById('songs-count');
+        const $songsHint = document.getElementById('songs-hint');
+        const $songsRefresh = document.getElementById('songs-refresh');
+
+        async function loadSongs(){
+          if(!$songsWall) return;
+          try {
+            if($songsHint) { $songsHint.textContent='Cargando…'; $songsHint.className='song-hint'; }
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/susana_songs?select=*&order=created_at.desc`, {
+              headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer '+SUPABASE_ANON }
+            });
+            if(!r.ok) throw new Error(await r.text());
+            const data = await r.json();
+            renderSongs(data);
+            if($songsHint) { $songsHint.textContent = `${data.length} canción(es) cargadas.`; $songsHint.className='song-hint ok'; setTimeout(()=>{$songsHint.textContent='';},2500); }
+          } catch(err){
+            console.warn('[admin] loadSongs', err);
+            if($songsHint){ $songsHint.textContent='Error cargando muro: '+ (err.message||err); $songsHint.className='song-hint error'; }
+          }
+        }
+
+        function renderSongs(items){
+          if(!$songsWall || !$songsCount || !$songsEmpty) return;
+          $songsCount.textContent = String(items.length);
+          if(!items.length){
+            $songsWall.innerHTML='';
+            $songsEmpty.style.display='block';
+            return;
+          }
+          $songsEmpty.style.display='none';
+          $songsWall.innerHTML = items.map(it => {
+            const d = it.created_at ? new Date(it.created_at).toLocaleString('es-CO', { dateStyle:'medium', timeStyle:'short'}) : '';
+            return `<li class="song-card" data-id="${esc(it.id)}">
+              <div class="song-card-head">
+                <div>
+                  <p class="song-card-title">${esc(it.song)}${it.artist ? ` <span style="font-weight:400;color:#6B564A">— ${esc(it.artist)}</span>` : ''}</p>
+                  <p class="song-card-artist">Sugirió: <strong>${esc(it.guest_name || 'Anónimo')}</strong> · <span style="font-size:.82rem;color:#8a7a6e">${esc(d)}</span></p>
+                </div>
+                <span class="song-card-meta">♪</span>
+              </div>
+              ${it.comment ? `<p class="song-card-comment">“${esc(it.comment)}”</p>` : ''}
+              <div class="song-card-actions"><button type="button" data-del-song="${esc(it.id)}" class="btn-danger">Eliminar</button></div>
+            </li>`;
+          }).join('');
+        }
+
+        if($songsWall) $songsWall.addEventListener('click', async (e)=>{
+          const btn = e.target.closest('[data-del-song]');
+          if(!btn) return;
+          const id = btn.getAttribute('data-del-song');
+          if(!confirm('¿Eliminar esta canción del muro? Esta acción no se puede deshacer.')) return;
+          btn.disabled=true; btn.textContent='Eliminando…';
+          try {
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_susana_song`, {
+              method:'POST',
+              headers: apiHeaders(),
+              body: JSON.stringify({ p_id: id, p_admin_token: adminToken })
+            });
+            if(!r.ok){
+              const t = await r.text();
+              if(t.includes('PIN inválido') || r.status===401) throw new Error('PIN inválido — vuelve a ingresar.');
+              throw new Error(t);
+            }
+            const ok = await r.json();
+            if(ok) {
+              if($songsHint){ $songsHint.textContent='Canción eliminada.'; $songsHint.className='song-hint ok'; }
+              await loadSongs();
+            } else {
+              if($songsHint){ $songsHint.textContent='No se encontró la canción.'; $songsHint.className='song-hint error'; }
+            }
+          } catch(err){
+            alert('Error al eliminar: '+(err.message||err));
+            btn.disabled=false; btn.textContent='Eliminar';
+            if(err.message && err.message.includes('PIN inválido')) setLoggedOut();
+          }
+        });
+
+        if($songsRefresh) $songsRefresh.addEventListener('click', loadSongs);
+
+        // ── Invitados (formato Milagros: tabla + botones estado + editar) ──
+        const $guestsWall = document.getElementById('admin-guest-wall');
+        const $guestsEmpty = document.getElementById('admin-guest-empty');
+        const $guestsCount = document.getElementById('guests-count');
+        const $guestsHint = document.getElementById('guests-hint');
+        const $guestsRefresh = document.getElementById('guests-refresh');
+        const $guestForm = document.getElementById('guest-form');
+        const $guestName = document.getElementById('guest-name');
+        const $guestCupos = document.getElementById('guest-cupos');
+        const $guestTreatment = document.getElementById('guest-treatment');
+        const $guestHint = document.getElementById('guest-hint');
+        const $guestSearch = document.getElementById('guest-search');
+
+        let allGuests = [];
+        let searchQuery = '';
+
+        async function loadGuests(){
+          if(!$guestsWall) return;
+          try {
+            if($guestsHint) { $guestsHint.textContent='Cargando…'; $guestsHint.className='song-hint'; }
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/susana_guests?select=*&order=created_at.desc`, {
+              headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer '+SUPABASE_ANON }
+            });
+            if(!r.ok) throw new Error(await r.text());
+            const data = await r.json();
+            allGuests = Array.isArray(data) ? data : [];
+            renderGuests();
+            if($guestsHint) { $guestsHint.textContent=`${allGuests.length} invitado(s).`; $guestsHint.className='song-hint ok'; setTimeout(()=>{$guestsHint.textContent='';},2500); }
+          } catch(err){
+            console.warn('[admin] loadGuests', err);
+            if($guestsHint){ $guestsHint.textContent='Error cargando invitados: '+(err.message||err); $guestsHint.className='song-hint error'; }
+          }
+        }
+
+        function matchesQuery(g){
+          if(!searchQuery) return true;
+          const q = searchQuery.toLowerCase();
+          const hay = `${g.name||''} ${g.cupos??''} ${g.status||''} ${g.treatment||''} ${g.note||''}`.toLowerCase();
+          return hay.includes(q);
+        }
+
+        function renderGuests(){
+          if(!$guestsWall || !$guestsCount || !$guestsEmpty) return;
+          const filtered = allGuests.filter(matchesQuery);
+          $guestsCount.textContent = String(filtered.length);
+          if(!allGuests.length){
+            $guestsWall.innerHTML='';
+            $guestsEmpty.style.display='block';
+            $guestsEmpty.textContent='No hay invitados aún. Añade el primero arriba.';
+            return;
+          }
+          if(!filtered.length){
+            $guestsWall.innerHTML='';
+            $guestsEmpty.style.display='block';
+            $guestsEmpty.textContent='Sin resultados para “'+esc(searchQuery)+'”.';
+            return;
+          }
+          $guestsEmpty.style.display='none';
+          $guestsWall.innerHTML = filtered.map(g => {
+            const status = STATUS_LABEL[g.status] || g.status || 'Pendiente';
+            const statusCls = STATUS_CLASS[g.status] || 'badge-pending';
+            const actions = STATUS_ACTIONS.map(a =>
+              `<button class="btn btn-sm ${a.cls}" type="button" data-action="status" data-status="${a.value}" data-id="${esc(g.id)}">${a.label}</button>`
+            ).join('');
+            return `<tr>
+              <td data-label="Nombre">${esc(g.name)}</td>
+              <td data-label="Cupos">${g.cupos ?? 1}</td>
+              <td data-label="Estado"><span class="badge ${statusCls}">${esc(status)}</span></td>
+              <td data-label="Acciones" class="row-actions">
+                <button class="btn btn-sm btn-ghost" type="button" data-action="edit" data-id="${esc(g.id)}">Editar</button>
+                ${actions}
+                <button class="btn btn-sm btn-danger" type="button" data-action="delete" data-id="${esc(g.id)}">Eliminar</button>
+              </td>
+            </tr>`;
+          }).join('');
+        }
+
+        if($guestSearch) $guestSearch.addEventListener('input', ()=>{
+          searchQuery = ($guestSearch.value||'').trim();
+          renderGuests();
+        });
+
+        if($guestForm) $guestForm.addEventListener('submit', async (e)=>{
+          e.preventDefault();
+          const name = ($guestName.value||'').trim();
+          const cuposVal = parseInt(($guestCupos.value||'1').trim(), 10);
+          const cupos = Number.isInteger(cuposVal) ? cuposVal : 1;
+          const treatment = ($guestTreatment.value||'a').trim() || 'a';
+          if(!name){
+            if($guestHint){ $guestHint.textContent='El nombre es obligatorio.'; $guestHint.className='song-hint error'; }
+            $guestName.focus();
+            return;
+          }
+          if(cupos < 1 || cupos > 999){
+            if($guestHint){ $guestHint.textContent='Cupos debe ser 1..999.'; $guestHint.className='song-hint error'; }
+            if($guestCupos) $guestCupos.focus();
+            return;
+          }
+          if(!['a','d','fam','grupo'].includes(treatment)){
+            if($guestHint){ $guestHint.textContent='Tratamiento inválido.'; $guestHint.className='song-hint error'; }
+            return;
+          }
+          const btn = document.getElementById('guest-submit');
+          if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+          if($guestHint){ $guestHint.textContent='Guardando…'; $guestHint.className='song-hint'; }
+          try {
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/add_susana_guest`, {
+              method:'POST',
+              headers: apiHeaders(),
+              body: JSON.stringify({ p_admin_token: adminToken, p_name: name, p_cupos: cupos, p_treatment: treatment, p_status: 'pendiente', p_note: null })
+            });
+            if(!r.ok){
+              const t = await r.text();
+              if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
+              throw new Error(t);
+            }
+            await r.json();
+            if($guestHint){ $guestHint.textContent='Invitado añadido.'; $guestHint.className='song-hint ok'; }
+            showToast('Invitado añadido.');
+            $guestForm.reset();
+            if($guestCupos) $guestCupos.value='1';
+            if($guestTreatment) $guestTreatment.value='a';
+            await loadGuests();
+          } catch(err){
+            if($guestHint){ $guestHint.textContent='Error: '+(err.message||err); $guestHint.className='song-hint error'; }
+            if(err.message && err.message.includes('PIN inválido')) setLoggedOut();
+          } finally {
+            if(btn){ btn.disabled=false; btn.textContent='Añadir invitado +'; }
+          }
+        });
+
+        if($guestsWall) $guestsWall.addEventListener('click', async (e)=>{
+          const target = e.target;
+          const btn = target.closest('[data-action]');
+          if(!btn) return;
+
+          if(btn.dataset.action === 'edit-cancel'){
+            renderGuests();
+            return;
+          }
+
+          const id = btn.dataset.id;
+          if(!id) return;
+
+          if(btn.dataset.action === 'edit-save'){
+            const tr = btn.closest('tr');
+            const nameInput = tr && tr.querySelector('[data-edit-name]');
+            const cuposInput = tr && tr.querySelector('[data-edit-cupos]');
+            const treatmentSel = tr && tr.querySelector('[data-edit-treatment]');
+            if(!nameInput || !cuposInput || !treatmentSel) return;
+            const name = (nameInput.value||'').trim();
+            const cupos = parseInt((cuposInput.value||'1').trim(), 10);
+            const treatment = (treatmentSel.value||'').trim();
+            // treatment "" -> null (limpia), else a/d/fam/grupo
+            if(!name){
+              if($guestsHint){ $guestsHint.textContent='El nombre no puede estar vacío.'; $guestsHint.className='song-hint error'; }
+              return;
+            }
+            if(!Number.isInteger(cupos) || cupos < 1 || cupos > 999){
+              if($guestsHint){ $guestsHint.textContent='Cupos debe ser 1..999.'; $guestsHint.className='song-hint error'; }
+              return;
+            }
+            if(treatment !== '' && !['a','d','fam','grupo'].includes(treatment)){
+              if($guestsHint){ $guestsHint.textContent='Tratamiento inválido.'; $guestsHint.className='song-hint error'; }
+              return;
+            }
+            if($guestsHint){ $guestsHint.textContent='Guardando…'; $guestsHint.className='song-hint'; }
+            try {
+              const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_susana_guest`, {
+                method:'POST',
+                headers: apiHeaders(),
+                body: JSON.stringify({ p_id: id, p_admin_token: adminToken, p_name: name, p_cupos: cupos, p_treatment: treatment === '' ? null : treatment })
+              });
+              if(!r.ok){
+                const t = await r.text();
+                if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
+                throw new Error(t);
+              }
+              const ok = await r.json();
+              if(!ok) throw new Error('No se encontró el invitado.');
+              showToast('Invitado actualizado.');
+              if($guestsHint){ $guestsHint.textContent='Invitado actualizado.'; $guestsHint.className='song-hint ok'; }
+              await loadGuests();
+            } catch(err){
+              if($guestsHint){ $guestsHint.textContent='Error: '+(err.message||err); $guestsHint.className='song-hint error'; }
+              if(err.message && err.message.includes('PIN inválido')) setLoggedOut();
+            }
+            return;
+          }
+
+          if(btn.dataset.action === 'edit'){
+            const guest = allGuests.find(g => String(g.id) === String(id));
+            if(!guest) return;
+            const tr = btn.closest('tr');
+            if(!tr) return;
+            const treatmentOptions = Object.entries(TREATMENT_LABEL).map(([value,label]) =>
+              `<option value="${value}" ${guest.treatment === value ? 'selected' : ''}>${label}</option>`
+            ).join('');
+            // default 'a' si guest.treatment es null
+            const isAuto = !guest.treatment;
+            tr.innerHTML = `<td colspan="4">
+              <div class="edit-form">
+                <label>Nombre
+                  <input data-edit-name type="text" value="${esc(guest.name)}" maxlength="80" />
+                </label>
+                <label>Cupos
+                  <input data-edit-cupos type="number" min="1" max="999" value="${guest.cupos ?? 1}" />
+                </label>
+                <label>Tratamiento
+                  <select data-edit-treatment>
+                    <option value="" ${isAuto ? 'selected' : ''}>Auto</option>
+                    ${treatmentOptions}
+                  </select>
+                </label>
+                <div class="edit-actions">
+                  <button class="btn btn-sm btn-confirm" type="button" data-action="edit-save" data-id="${esc(guest.id)}">Guardar</button>
+                  <button class="btn btn-sm btn-ghost" type="button" data-action="edit-cancel">Cancelar</button>
+                </div>
+              </div>
+            </td>`;
+            return;
+          }
+
+          if(btn.dataset.action === 'status'){
+            const status = btn.dataset.status;
+            if(!status) return;
+            if($guestsHint){ $guestsHint.textContent='Actualizando…'; $guestsHint.className='song-hint'; }
+            try {
+              const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_susana_guest`, {
+                method:'POST',
+                headers: apiHeaders(),
+                body: JSON.stringify({ p_id: id, p_admin_token: adminToken, p_status: status })
+              });
+              if(!r.ok){
+                const t = await r.text();
+                if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
+                throw new Error(t);
+              }
+              await r.json();
+              showToast('Estado actualizado.');
+              await loadGuests();
+            } catch(err){
+              if($guestsHint){ $guestsHint.textContent='Error: '+(err.message||err); $guestsHint.className='song-hint error'; }
+              if(err.message && err.message.includes('PIN inválido')) setLoggedOut();
+            }
+            return;
+          }
+
+          if(btn.dataset.action === 'delete'){
+            if(!confirm('¿Eliminar este invitado?')) return;
+            btn.disabled=true; btn.textContent='Eliminando…';
+            try {
+              const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_susana_guest`, {
+                method:'POST',
+                headers: apiHeaders(),
+                body: JSON.stringify({ p_id: id, p_admin_token: adminToken })
+              });
+              if(!r.ok){
+                const t = await r.text();
+                if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
+                throw new Error(t);
+              }
+              const ok = await r.json();
+              if(ok){
+                if($guestsHint){ $guestsHint.textContent='Invitado eliminado.'; $guestsHint.className='song-hint ok'; }
+                showToast('Invitado eliminado.');
+                await loadGuests();
+              } else {
+                if($guestsHint){ $guestsHint.textContent='No se encontró el invitado.'; $guestsHint.className='song-hint error'; }
+              }
+            } catch(err){
+              alert('Error al eliminar: '+(err.message||err));
+              btn.disabled=false; btn.textContent='Eliminar';
+              if(err.message && err.message.includes('PIN inválido')) setLoggedOut();
+            }
+            return;
+          }
+        });
+
+        if($guestsRefresh) $guestsRefresh.addEventListener('click', loadGuests);
+      })();
+    </script>
+  </body>
+</html>
+
+<style is:global>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Parisienne&family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
+:root{--cream:#F8F3EA;--off-white:#EDE9E2;--sand:#DCCDB4;--rose:#C9A496;--terracotta:#B07B5C;--brown:#8C6B58;--olive:#96702B;--taupe:#87736C;--espresso:#4C2D1F;--black:#1A1A1A;--white:#FFFFFF;--serif:'Playfair Display',Georgia,serif;--sans:'DM Sans',sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--cream);color:#3B2E24;font:17px/1.65 var(--sans)}
+.admin-main{max-width:900px;margin:0 auto;padding:0 1rem 3rem}
+.admin-hero{text-align:center;padding:3rem 1rem 1.5rem;background:var(--espresso);color:#F3E9DC;margin:0 -1rem 2rem;border-bottom:4px solid var(--terracotta)}
+.admin-hero h1{font:400 clamp(1.8rem,5vw,2.6rem)/1.1 var(--serif);margin:.4rem 0 .3rem;letter-spacing:-.02em}
+.admin-hero h1 em{font-style:italic;color:var(--sand)}
+.admin-subtitle{margin:0;color:#D9CBB8;font-size:.95rem}
+.admin-back{display:inline-block;margin-bottom:.8rem;color:var(--sand);text-decoration:none;font:500 .78rem var(--sans);letter-spacing:.08em;text-transform:uppercase;border:1px solid #ffffff22;padding:.45rem .7rem}
+.admin-back:hover{background:#ffffff12}
+.section{padding:2.2rem 0}
+.eyebrow{color:var(--olive);margin:0 0 .4rem;letter-spacing:.18em;text-transform:uppercase;font-size:.7rem}
+.admin-desc{margin:.2rem 0 0;color:#6B564A;font-size:.92rem}
+.admin-section{border-top:1px solid #E0D6C2;padding-top:2rem}
+.admin-section--accent{background:#FBF6EC;border:1px solid #E0D6C2;box-shadow:8px 8px 0 #DCCDB4;padding:1.6rem 1.4rem;margin-top:1.5rem}
+.admin-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+.admin-section-head h2{font:400 1.6rem var(--serif);margin:.1rem 0 .2rem;color:var(--espresso)}
+.admin-section-head h2 em{font-style:italic;color:var(--terracotta)}
+.admin-toolbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+.admin-badge{background:var(--espresso);color:var(--sand);font:700 .7rem var(--sans);letter-spacing:.1em;text-transform:uppercase;padding:.35rem .6rem;border-radius:999px}
+.gate-card{max-width:520px;margin:0 auto;background:#FBF6EC;border:1px solid #E0D6C2;box-shadow:8px 8px 0 #DCCDB4;padding:1.8rem 1.4rem;text-align:center}
+.gate-card h2{font:400 1.5rem var(--serif);margin:0 0 .4rem;color:var(--espresso)}
+.gate-card p{margin:0 0 1rem;color:#4C3B32}
+.gate-form{display:grid;gap:.8rem;text-align:left}
+.gate-hint{margin:0;font-size:.88rem;min-height:1.2em}
+.gate-hint.error{color:#9c4a2e}
+.gate-hint.ok{color:#5a7247}
+.gate-help{margin:.6rem 0 0;font-size:.75rem;color:#8a7a6e;line-height:1.5;word-break:break-word}
+.gate-help code{background:#fff;border:1px solid #E0D6C2;padding:.1rem .3rem;font-size:.72rem}
+.button{display:inline-block;border:1px solid var(--terracotta);background:var(--terracotta);color:#FFF8EE;text-decoration:none;padding:.85rem 1.5rem;font:500 .78rem var(--sans);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;min-height:44px}
+.button:hover{background:var(--brown);border-color:var(--brown)}
+.button:disabled{opacity:.6;cursor:not-allowed}
+.button-light{background:transparent;color:var(--espresso);border-color:var(--terracotta)}
+.button-light:hover{background:var(--terracotta);color:#FFF8EE}
+.field{display:flex;flex-direction:column;gap:.35rem}
+.field span{font:500 .72rem var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--olive)}
+.field span i{font-style:normal;text-transform:none;letter-spacing:0;color:#8a7a6e;font-weight:400}
+.field input,.field textarea,.field select{width:100%;border:1px solid #DCCDB4;background:#fff;color:#3B2E24;font:400 .95rem var(--sans);padding:.75rem .9rem;border-radius:2px;outline:none;transition:border-color .18s,box-shadow .18s}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--terracotta);box-shadow:0 0 0 3px #B07B5C22}
+.song-form{max-width:720px;margin:0 0 1.2rem;text-align:left;background:#fff;border:1px solid #E8D9C2;padding:1.2rem 1rem}
+.guest-form{background:#fff}
+.guest-grid{display:grid;grid-template-columns:1.4fr .6fr .9fr;gap:.8rem;margin-bottom:.8rem}
+.field-full{margin-bottom:.8rem}
+.song-actions{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.song-hint{margin:0;font-size:.88rem;color:var(--olive);min-height:1.2em}
+.song-hint.error{color:#9c4a2e}
+.song-hint.ok{color:#5a7247}
+.admin-actions-row{display:flex;align-items:center;gap:.8rem;margin:.8rem 0;flex-wrap:wrap}
+.song-count{background:var(--espresso);color:var(--sand);font:700 .78rem var(--sans);padding:.2rem .55rem;border-radius:999px;min-width:1.6rem;text-align:center}
+.song-wall{list-style:none;margin:0;padding:0;display:grid;gap:.9rem}
+.song-card{background:#fff;border:1px solid #E8D9C2;padding:1rem 1.1rem;display:grid;gap:.35rem;position:relative;overflow:hidden}
+.song-card:before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--terracotta),var(--sand))}
+.song-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem}
+.song-card-title{font:500 1.05rem var(--serif);color:var(--espresso);margin:0;line-height:1.2}
+.song-card-artist{font:400 .88rem var(--sans);color:#6B564A;margin:0}
+.song-card-meta{font:500 .68rem var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--olive);white-space:nowrap}
+.song-card-comment{margin:0;color:#4C3B32;font-size:.92rem;line-height:1.5;background:#F8F3EA;padding:.6rem .7rem;border-radius:2px}
+.song-card-actions{display:flex;gap:.6rem;margin-top:.2rem}
+.song-empty{margin:1rem 0 0;color:#8a7a6e;font-size:.92rem;text-align:center;background:#FBF6EC;border:1px dashed #DCCDB4;padding:1.2rem}
+.btn-danger{border:1px solid #E0D6C2;background:#FBF6EC;color:#8a3a2a;font:500 .72rem var(--sans);letter-spacing:.06em;text-transform:uppercase;padding:.4rem .65rem;cursor:pointer}
+.btn-danger:hover{background:#f3d6cd;border-color:#d9b0a3}
+.admin-search{margin:.6rem 0 .8rem}
+.admin-search input[type=search]{width:100%;max-width:420px;padding:.7rem .9rem;border:1px solid #DCCDB4;background:#fff;color:#3B2E24;font:400 .9rem var(--sans)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:.4rem}
+th,td{text-align:left;padding:.7rem .6rem;border-bottom:1px solid #E8D9C2;vertical-align:middle}
+th{font:500 .68rem var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--olive)}
+td{color:var(--espresso)}
+.row-actions{display:flex;gap:.35rem;flex-wrap:wrap}
+.badge{display:inline-block;padding:.22rem .6rem;border-radius:999px;font:500 .66rem var(--sans);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.badge-pending{background:#F8F3EA;color:#8a7a6e;border:1px solid #DCCDB4}
+.badge-confirmed{background:#e6f0e0;color:#3d5a2e;border:1px solid #c2d8b8}
+.badge-declined{background:#fde8e0;color:#8a3a2a;border:1px solid #e8c0b0}
+.btn{border:1px solid var(--terracotta);border-radius:0;padding:.6rem .9rem;font:500 .72rem var(--sans);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;background:#fff;color:var(--espresso)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{border-color:#DCCDB4;color:#6B564A;background:#fff}
+.btn-ghost:hover{background:#FBF6EC}
+.btn-sm{padding:.42rem .65rem;font-size:.66rem}
+.btn-confirm{background:#3d5a2e;border-color:#3d5a2e;color:#fff8ee}
+.btn-confirm:hover{background:#2e4a22}
+.btn-decline{background:#9c4a2e;border-color:#9c4a2e;color:#fff8ee}
+.btn-decline:hover{background:#7a3520}
+.btn-pending{background:#F8F3EA;border-color:#DCCDB4;color:#8a7a6e}
+.btn-pending:hover{background:#EDE9E2}
+.edit-form{display:grid;grid-template-columns:1fr .7fr 1fr;gap:.7rem;align-items:end;background:#FBF6EC;border:1px dashed #DCCDB4;padding:.9rem}
+.edit-form label{display:flex;flex-direction:column;gap:.3rem;font:500 .68rem var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--olive)}
+.edit-form input,.edit-form select{width:100%;padding:.6rem .7rem;border:1px solid #DCCDB4;background:#fff;color:var(--espresso);font:400 .95rem var(--sans)}
+.edit-actions{display:flex;gap:.5rem;flex-wrap:wrap;grid-column:1 / -1}
+.toast{position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%);background:var(--espresso);color:#F3E9DC;padding:.6rem 1.1rem;font:500 .8rem var(--sans);box-shadow:0 8px 20px rgba(76,45,31,.25);z-index:30}
+@media (max-width:720px){
+  .admin-main{padding:0 .7rem 2rem}
+  .admin-hero{margin:0 -.7rem 1.5rem;padding:2rem 1rem 1.2rem}
+  .guest-grid{grid-template-columns:1fr}
+  .admin-section--accent{padding:1.2rem 1rem}
+  .table-wrap{overflow:visible}
+  thead{display:none}
+  table,tr,td{display:block}
+  tr{background:#fff;border:1px solid #E8D9C2;padding:.85rem 1rem;margin-bottom:.9rem;box-shadow:5px 5px 0 #DCCDB4}
+  td{padding:.4rem .1rem;border-bottom:0;display:flex;justify-content:space-between;align-items:center;gap:.7rem;font-size:.95rem}
+  td::before{content:attr(data-label);font:500 .62rem var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--olive);flex-shrink:0}
+  td[colspan]{display:block}
+  td[colspan]::before{display:none}
+  .row-actions{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding-top:.7rem;border-top:1px dashed #E8D9C2;margin-top:.6rem}
+  .row-actions .btn{width:100%;min-height:44px}
+  .edit-form{grid-template-columns:1fr;align-items:stretch}
+  .edit-form input,.edit-form select{font-size:16px}
+  .admin-search input[type=search]{font-size:16px;max-width:none}
+}
+</style>
