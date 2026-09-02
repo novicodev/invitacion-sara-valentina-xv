@@ -40,24 +40,6 @@
           <button id="admin-logout" type="button" class="button button-light">Cerrar sesión</button>
         </div>
 
-        <!-- MURO -->
-        <section class="section admin-section">
-          <div class="admin-section-head">
-            <div>
-              <p class="eyebrow">Moderación</p>
-              <h2>Muro de <em>canciones</em></h2>
-              <p class="admin-desc">Elimina contenido indebido. El muro público (/) refleja los cambios al instante.</p>
-            </div>
-            <span id="songs-count" class="song-count">0</span>
-          </div>
-          <div class="admin-actions-row">
-            <button id="songs-refresh" type="button" class="button button-light">Actualizar</button>
-            <span id="songs-hint" class="song-hint" aria-live="polite"></span>
-          </div>
-          <ul id="admin-song-wall" class="song-wall" aria-live="polite"></ul>
-          <p id="admin-song-empty" class="song-empty">No hay canciones aún.</p>
-        </section>
-
         <!-- INVITADOS -->
         <section class="section admin-section admin-section--accent">
           <div class="admin-section-head">
@@ -106,6 +88,23 @@
             </table>
           </div>
           <p id="admin-guest-empty" class="song-empty">No hay invitados aún. Añade el primero arriba.</p>
+        </section>
+
+        <!-- MURO -->
+        <section class="section admin-section">
+          <div class="admin-section-head">
+            <div>
+              <p class="eyebrow">Moderación</p>
+              <h2>Muro de <em>canciones</em></h2>
+            </div>
+            <span id="songs-count" class="song-count">0</span>
+          </div>
+          <div class="admin-actions-row">
+            <button id="songs-refresh" type="button" class="button button-light">Actualizar</button>
+            <span id="songs-hint" class="song-hint" aria-live="polite"></span>
+          </div>
+          <ul id="admin-song-wall" class="song-wall" aria-live="polite"></ul>
+          <p id="admin-song-empty" class="song-empty">No hay canciones aún.</p>
         </section>
       </div>
     </main>
