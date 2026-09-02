@@ -135,7 +135,7 @@ const phone = '573007329023';
       tick(); setInterval(tick, 1000);
     </script>
     <script is:inline>
-      // ── Música FAB: suena tras el primer scroll/touch en celular, con fallback a click ──
+      // ── Música FAB: sin autoplay (políticas de navegadores) — solo por tap ──
       (function(){
         const audio = document.getElementById('bg-audio');
         const btn = document.getElementById('music-fab');
@@ -143,9 +143,6 @@ const phone = '573007329023';
         const icon = btn.querySelector('.music-icon');
         const text = btn.querySelector('.music-text');
         let playing = false;
-        let autoTried = false;
-        const isMobile = () => window.matchMedia('(max-width: 720px)').matches || 'ontouchstart' in window;
-        const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const setState = (on) => {
           playing = on;
           btn.setAttribute('aria-pressed', String(on));
@@ -164,33 +161,6 @@ const phone = '573007329023';
         });
         audio.addEventListener('ended', () => setState(false));
         audio.addEventListener('error', () => { btn.style.display='none'; });
-        // Auto-play suave en celular tras el primer gesto de scroll/touch
-        const tryAutoPlay = async () => {
-          if(autoTried || playing || prefersReduced) return;
-          if(!isMobile()) return;
-          autoTried = true;
-          try {
-            audio.volume = 0.55;
-            await audio.play();
-            setState(true);
-          } catch(e){
-            // iOS/Safari bloquea autoplay incluso tras scroll; el usuario deberá tocar el FAB
-            autoTried = false;
-            console.warn('[audio] autoplay tras scroll bloqueado', e);
-          }
-          // limpiar listeners tras el primer intento (exitoso o no)
-          window.removeEventListener('scroll', onScrollOnce, { capture: true });
-          window.removeEventListener('touchstart', tryAutoPlay);
-          window.removeEventListener('click', tryAutoPlay);
-        };
-        const onScrollOnce = () => {
-          // exige un desplazamiento real (>12px) para no disparar por rebote inicial
-          if(window.scrollY > 12) tryAutoPlay();
-        };
-        window.addEventListener('scroll', onScrollOnce, { capture: true, passive: true });
-        window.addEventListener('touchstart', tryAutoPlay, { passive: true });
-        // también cuenta un primer tap en cualquier parte (gesto válido para iOS)
-        window.addEventListener('click', tryAutoPlay, { once: true });
       })();
     </script>
     <script is:inline>
