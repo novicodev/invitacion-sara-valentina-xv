@@ -26,7 +26,6 @@ const calendarUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE
           <p class="hero-date">06 · NOVIEMBRE · 2026</p>
           <a class="enter" href="#invitacion">Descubrir la invitación <span>↓</span></a>
         </div>
-        <div class="hero-photo"><img src="/sara-valentina.jpeg" alt="Sara Valentina" /></div>
       </section>
 
       <section class="invitation section" id="invitacion">
@@ -52,7 +51,7 @@ const calendarUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE
       </section>
 
       <section class="dress section">
-        <div class="dress-art"><img src="/marco-referencia.jpeg" alt="Detalle floral de la invitación" /></div>
+        <div class="place-card"><span class="place-symbol">✦</span><p class="overline blush">Recepción</p><strong>Lugar<br /><em>por definir</em></strong><small>Pronto compartiremos todos los detalles.</small></div>
         <div class="dress-copy">
           <p class="overline blush">Código de vestuario</p>
           <h2>Una noche<br /><em>en tonos joya.</em></h2>
@@ -98,4 +97,6 @@ const calendarUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE
   .rsvp{min-height:32rem}
   footer{padding-bottom:3rem}
   @media(max-width:700px){main{padding-top:.25rem}.hero,.section{width:calc(100% - 1rem);margin:.5rem auto;border-radius:.9rem}.hero{min-height:calc(100svh - 1rem)}.hero-frame{inset:.7rem}.invitation,.details,.dress,.rsvp{min-height:0}.invitation{padding-top:5.5rem;padding-bottom:5.5rem}.details{padding-top:4.5rem;padding-bottom:4.5rem}.dress{padding-top:4.5rem;padding-bottom:4.5rem}.rsvp{padding-top:5rem;padding-bottom:5rem}}
+  .place-card{height:30rem;border:1px solid var(--gold);background:linear-gradient(145deg,#171011,#0b0b0b);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1.1rem;transform:rotate(-3deg);padding:2rem}.place-symbol{font-size:2.4rem;color:var(--gold)}.place-card .overline{margin:0}.place-card strong{font:500 clamp(2.8rem,6vw,4.5rem)/.82 var(--serif);color:var(--paper)}.place-card strong em{font-style:italic;color:var(--rose-light)}.place-card small{max-width:13rem;color:var(--muted);font:1rem/1.35 var(--serif)}
+  @media(max-width:700px){.place-card{height:18rem;max-width:15rem;margin:auto}}
 </style>
