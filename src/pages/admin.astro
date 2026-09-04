@@ -20,11 +20,11 @@
       <section id="admin-gate" class="admin-gate section">
         <div class="gate-card">
           <h2>Acceso privado</h2>
-          <p>Ingresa el PIN de administradora para continuar.</p>
+            <p>Ingresa la contraseña para continuar.</p>
           <form id="gate-form" class="gate-form" novalidate>
             <label class="field">
-              <span>PIN <i>*</i></span>
-              <input id="gate-pin" type="password" autocomplete="current-password" placeholder="••••••••" required />
+              <span>Contraseña <i>*</i></span>
+              <input id="gate-pin" type="password" autocomplete="off" placeholder="Ingresa la contraseña" required />
             </label>
             <button type="submit" class="button" id="gate-submit">Entrar</button>
             <p id="gate-hint" class="gate-hint" aria-live="polite"></p>
@@ -114,6 +114,8 @@
       (function(){
         const SUPABASE_URL = 'https://pfzhazkcyarlwazwziec.supabase.co';
         const SUPABASE_ANON = 'sb_publishable_mxYQbSZsvviLuSBm1-fUaQ_U4iAFIQ-';
+        const LEGACY_ADMIN_URL = 'https://pfzhazkcyarlwazwziec.supabase.co/functions/v1/guest-admin';
+        const ADMIN_SLUG = 'susana-xv';
         const STORAGE_KEY = 'susana-admin-token';
 
         const $gate = document.getElementById('admin-gate');
@@ -145,14 +147,12 @@
 
         async function verifyToken(token){
           try {
-            const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_susana_admin`, {
+            const r = await fetch(LEGACY_ADMIN_URL, {
               method: 'POST',
-              headers: apiHeaders(),
-              body: JSON.stringify({ p_admin_token: token })
+              headers: { 'Content-Type':'application/json', 'x-admin-secret':token },
+              body: JSON.stringify({ action:'list', slug:ADMIN_SLUG })
             });
-            if(!r.ok) throw new Error(await r.text());
-            const v = await r.json();
-            return v === true;
+            return r.ok;
           } catch(e){
             console.warn('[admin] verify failed', e);
             return false;
@@ -203,7 +203,7 @@
           e.preventDefault();
           const token = ($pin.value||'').trim();
           if(!token){
-            $gateHint.textContent='Escribe el PIN.';
+            $gateHint.textContent='Escribe la contraseña.';
             $gateHint.className='gate-hint error';
             return;
           }
@@ -218,7 +218,7 @@
             $gateHint.className='gate-hint ok';
             setTimeout(()=> setLoggedIn(token), 300);
           } else {
-            $gateHint.textContent='PIN incorrecto.';
+            $gateHint.textContent='Contraseña incorrecta.';
             $gateHint.className='gate-hint error';
           }
         });
@@ -325,12 +325,13 @@
           if(!$guestsWall) return;
           try {
             if($guestsHint) { $guestsHint.textContent='Cargando…'; $guestsHint.className='song-hint'; }
-            const r = await fetch(`${SUPABASE_URL}/rest/v1/susana_guests?select=*&order=created_at.desc`, {
-              headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer '+SUPABASE_ANON }
+            const r = await fetch(LEGACY_ADMIN_URL, {
+              method:'POST', headers:{'Content-Type':'application/json','x-admin-secret':adminToken},
+              body:JSON.stringify({action:'list',slug:ADMIN_SLUG})
             });
             if(!r.ok) throw new Error(await r.text());
-            const data = await r.json();
-            allGuests = Array.isArray(data) ? data : [];
+            const body = await r.json();
+            allGuests = Array.isArray(body) ? body : (Array.isArray(body.guests) ? body.guests : (Array.isArray(body.data) ? body.data : []));
             renderGuests();
             if($guestsHint) { $guestsHint.textContent=`${allGuests.length} invitado(s).`; $guestsHint.className='song-hint ok'; setTimeout(()=>{$guestsHint.textContent='';},2500); }
           } catch(err){
@@ -374,6 +375,7 @@
               <td data-label="Cupos">${g.cupos ?? 1}</td>
               <td data-label="Estado"><span class="badge ${statusCls}">${esc(status)}</span></td>
               <td data-label="Acciones" class="row-actions">
+                <button class="btn btn-sm btn-ghost" type="button" data-action="copy" data-id="${esc(g.id)}">Copiar link</button>
                 <button class="btn btn-sm btn-ghost" type="button" data-action="edit" data-id="${esc(g.id)}">Editar</button>
                 ${actions}
                 <button class="btn btn-sm btn-danger" type="button" data-action="delete" data-id="${esc(g.id)}">Eliminar</button>
@@ -411,14 +413,14 @@
           if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
           if($guestHint){ $guestHint.textContent='Guardando…'; $guestHint.className='song-hint'; }
           try {
-            const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/add_susana_guest`, {
+            const r = await fetch(LEGACY_ADMIN_URL, {
               method:'POST',
-              headers: apiHeaders(),
-              body: JSON.stringify({ p_admin_token: adminToken, p_name: name, p_cupos: cupos, p_treatment: treatment, p_status: 'pendiente', p_note: null })
+              headers:{'Content-Type':'application/json','x-admin-secret':adminToken},
+              body: JSON.stringify({ action:'mint', slug:ADMIN_SLUG, lines:`${name}; ${cupos}; ${treatment}` })
             });
             if(!r.ok){
               const t = await r.text();
-              if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
+              if(t.includes('401') || t.includes('secret')) throw new Error('Admin secret inválido — vuelve a ingresar.');
               throw new Error(t);
             }
             await r.json();
@@ -430,7 +432,7 @@
             await loadGuests();
           } catch(err){
             if($guestHint){ $guestHint.textContent='Error: '+(err.message||err); $guestHint.className='song-hint error'; }
-            if(err.message && err.message.includes('PIN inválido')) setLoggedOut();
+            if(err.message && err.message.includes('Admin secret inválido')) setLoggedOut();
           } finally {
             if(btn){ btn.disabled=false; btn.textContent='Añadir invitado +'; }
           }
@@ -448,6 +450,15 @@
 
           const id = btn.dataset.id;
           if(!id) return;
+
+          if(btn.dataset.action === 'copy'){
+            const guest = allGuests.find(g => String(g.id) === String(id));
+            if(!guest || !guest.token){ showToast('Este invitado no tiene token.'); return; }
+            const link = `${window.location.origin}/?invitacion=${encodeURIComponent(guest.token)}`;
+            try { await navigator.clipboard.writeText(link); showToast('Link copiado.'); }
+            catch { window.prompt('Copia este link:', link); }
+            return;
+          }
 
           if(btn.dataset.action === 'edit-save'){
             const tr = btn.closest('tr');
@@ -473,11 +484,7 @@
             }
             if($guestsHint){ $guestsHint.textContent='Guardando…'; $guestsHint.className='song-hint'; }
             try {
-              const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_susana_guest`, {
-                method:'POST',
-                headers: apiHeaders(),
-                body: JSON.stringify({ p_id: id, p_admin_token: adminToken, p_name: name, p_cupos: cupos, p_treatment: treatment === '' ? null : treatment })
-              });
+              const r = await fetch(LEGACY_ADMIN_URL, { method:'POST', headers:{'Content-Type':'application/json','x-admin-secret':adminToken}, body:JSON.stringify({ action:'update_guest', slug:ADMIN_SLUG, id, name, cupos, treatment:treatment === '' ? null : treatment }) });
               if(!r.ok){
                 const t = await r.text();
                 if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
@@ -533,11 +540,7 @@
             if(!status) return;
             if($guestsHint){ $guestsHint.textContent='Actualizando…'; $guestsHint.className='song-hint'; }
             try {
-              const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_susana_guest`, {
-                method:'POST',
-                headers: apiHeaders(),
-                body: JSON.stringify({ p_id: id, p_admin_token: adminToken, p_status: status })
-              });
+              const r = await fetch(LEGACY_ADMIN_URL, { method:'POST', headers:{'Content-Type':'application/json','x-admin-secret':adminToken}, body:JSON.stringify({ action:'set_status', slug:ADMIN_SLUG, id, status }) });
               if(!r.ok){
                 const t = await r.text();
                 if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
@@ -557,11 +560,7 @@
             if(!confirm('¿Eliminar este invitado?')) return;
             btn.disabled=true; btn.textContent='Eliminando…';
             try {
-              const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_susana_guest`, {
-                method:'POST',
-                headers: apiHeaders(),
-                body: JSON.stringify({ p_id: id, p_admin_token: adminToken })
-              });
+              const r = await fetch(LEGACY_ADMIN_URL, { method:'POST', headers:{'Content-Type':'application/json','x-admin-secret':adminToken}, body:JSON.stringify({ action:'delete_guest', slug:ADMIN_SLUG, id }) });
               if(!r.ok){
                 const t = await r.text();
                 if(t.includes('PIN inválido')) throw new Error('PIN inválido — vuelve a ingresar.');
